@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Local arXiv Search (OpenSearch)</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 40px;
+  max-width: 900px;
+}
+
+h1 {
+  color: #0b3d91;
+}
+
+input, select {
+  padding: 10px;
+  margin: 5px;
+  width: 300px;
+}
+
+button {
+  padding: 10px 15px;
+  cursor: pointer;
+}
+
+.result {
+  border-bottom: 1px solid #ddd;
+  padding: 10px 0;
+}
+
+.title {
+  font-weight: bold;
+  color: #1a0dab;
+}
+
+.meta {
+  font-size: 12px;
+  color: gray;
+}
+</style>
+
+</head>
+
+<body>
+
+<h1>arXiv Search (Local OpenSearch)</h1>
+
+<input id="query" placeholder="Search papers (e.g. quantum gravity)">
+<br>
+
+<!-- MAIN CATEGORY -->
+<select id="mainCat">
+    <option value="">-- Main Category --</option>
+</select>
+
+<!-- SUB CATEGORY -->
+<select id="subCat">
+    <option value="">-- Subcategory --</option>
+</select>
+
+<br>
+
+<input id="abstract" placeholder="Abstract">
+<br>
+
+<button onclick="newSearch()">Search</button>
+
+<hr>
+
+<div id="pagination" style="margin-top:20px;">
+	<button id="prevBtn" onclick="prevPage()">Previous</button>
+	<span id="pageInfo">Page 1</span>
+	<button id="nextBtn" onclick="nextPage()">Next</button>
+</div>
+
+<div id="results"></div>
+
+<div id="pagination" style="margin-top:20px;">
+	<button id="prevBtn" onclick="prevPage()">Previous</button>
+	<span id="pageInfo">Page 1</span>
+	<button id="nextBtn" onclick="nextPage()">Next</button>
+</div>
+
+<script>
+let currentPage = 1;
+const PAGE_SIZE = 100;
+
+const subs = {
+    "cs": [
+        "cs.AI", "cs.AR", "cs.CC", "cs.CE", "cs.CG", "cs.CL", "cs.CR", "cs.CV",
+        "cs.CY", "cs.DB", "cs.DC", "cs.DL", "cs.DM", "cs.DS", "cs.ET", "cs.FL",
+        "cs.GL", "cs.GR", "cs.GT", "cs.HC", "cs.IR", "cs.IT", "cs.LG", "cs.LO",
+        "cs.MA", "cs.MM", "cs.MS", "cs.NA", "cs.NE", "cs.NI", "cs.OH", "cs.OS",
+        "cs.PF", "cs.PL", "cs.RO", "cs.SC", "cs.SD", "cs.SE", "cs.SI", "cs.SY"
+    ],
+
+    "econ": [
+        "econ.EM", "econ.GN", "econ.TH"
+    ],
+
+    "eess": [
+        "eess.AS", "eess.IV", "eess.SP", "eess.SY"
+    ],
+
+    "math": [
+        "math.AC", "math.AG", "math.AP", "math.AT",
+        "math.CA", "math.CO", "math.CT", "math.CV",
+        "math.DG", "math.DS", "math.FA", "math.GM",
+        "math.GN", "math.GR", "math.GT", "math.HO",
+        "math.IT", "math.KT", "math.LO", "math.MG",
+        "math.MP", "math.NA", "math.NT", "math.OA",
+        "math.OC", "math.PR", "math.QA", "math.RA",
+        "math.RT", "math.SG", "math.SP", "math.ST"
+    ],
+
+    "astro-ph": [
+        "astro-ph.CO", "astro-ph.EP", "astro-ph.GA",
+        "astro-ph.HE", "astro-ph.IM", "astro-ph.SR"
+    ],
+
+    "cond-mat": [
+        "cond-mat.dis-nn", "cond-mat.mes-hall", "cond-mat.mtrl-sci",
+        "cond-mat.other", "cond-mat.quant-gas", "cond-mat.soft",
+        "cond-mat.stat-mech", "cond-mat.str-el", "cond-mat.supr-con"
+    ],
+
+    "nlin": [
+        "nlin.AO", "nlin.CD", "nlin.CG", "nlin.PS", "nlin.SI"
+    ],
+
+    "physics": [
+        "physics.acc-ph", "physics.ao-ph", "physics.app-ph",
+        "physics.atm-clus", "physics.atom-ph", "physics.bio-ph",
+        "physics.chem-ph", "physics.class-ph", "physics.comp-ph",
+        "physics.data-an", "physics.ed-ph", "physics.flu-dyn",
+        "physics.gen-ph", "physics.geo-ph", "physics.hist-ph",
+        "physics.ins-det", "physics.med-ph", "physics.optics",
+        "physics.plasm-ph", "physics.pop-ph", "physics.soc-ph",
+        "physics.space-ph"
+    ],
+
+    "q-bio": [
+        "q-bio.BM", "q-bio.CB", "q-bio.GN", "q-bio.MN", "q-bio.NC",
+        "q-bio.OT", "q-bio.PE", "q-bio.QM", "q-bio.SC", "q-bio.TO"
+    ],
+
+    "q-fin": [
+        "q-fin.CP", "q-fin.EC", "q-fin.GN", "q-fin.MF",
+        "q-fin.PM", "q-fin.PR", "q-fin.RM", "q-fin.ST", "q-fin.TR"
+    ],
+
+    "stat": [
+        "stat.AP", "stat.CO", "stat.ME",
+        "stat.ML", "stat.OT", "stat.TH"
+    ],
+
+    "high_energy": [
+        "gr-qc",
+        "hep-ex",
+        "hep-lat",
+        "hep-ph",
+        "hep-th",
+        "math-ph",
+        "nucl-ex",
+        "nucl-th",
+        "quant-ph"
+    ]
+}
+
+// ---------- populate main category ----------
+const mainCat = document.getElementById("mainCat");
+const subCat = document.getElementById("subCat");
+
+for (const cat in subs) {
+    const opt = document.createElement("option");
+    opt.value = cat;
+    opt.textContent = cat;
+    mainCat.appendChild(opt);
+}
+
+// ---------- update subcategories ----------
+mainCat.addEventListener("change", () => {
+    subCat.innerHTML = '<option value="">-- Subcategory --</option>';
+
+    const list = subs[mainCat.value] || [];
+
+    for (const s of list) {
+        const opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = s;
+        subCat.appendChild(opt);
+    }
+});
+
+async function search(page = currentPage) {
+    currentPage = page;
+    const q = document.getElementById("query").value;
+    const cat = document.getElementById("subCat").value;
+    const abs = document.getElementById("abstract").value;
+
+    let must = [];
+    let filter = [];
+
+    if (q) {
+        must.push({
+            multi_match: {
+                query: q,
+                fields: [
+                    "title^5",
+                    "authors^4",
+                    "abstract^3",
+                    "categories^3",
+                    "comments^2",
+                    "journal-ref^2",
+                    "report-no^2",
+                    "submitter",
+                    "doi"
+                ],
+                type: "best_fields",
+                fuzziness: "AUTO"
+            }
+        });
+    }
+
+    if (cat) {
+        filter.push({
+            match: {
+                categories: cat
+            }
+        });
+    }
+
+    if (abs) {
+        must.push({
+            match: {
+                abstract: abs
+            }
+        });
+    }
+
+    if (must.length === 0 && filter.length === 0) {
+        must.push({ match_all: {} });
+    }
+
+	const body = {
+		track_total_hits: true,
+
+		query: {
+			bool: { must, filter }
+		},
+
+		from: (page - 1) * PAGE_SIZE,
+		size: PAGE_SIZE
+	};
+
+    const res = await fetch("http://localhost:9200/arxiv/_search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+        document.getElementById("results").innerHTML =
+            `<p>Search failed: ${res.status}</p>`;
+        return;
+    }
+
+    const data = await res.json();
+    const hits = data.hits.hits;
+
+	const totalHits = data.hits.total.value;
+	const totalPages = Math.ceil(totalHits / PAGE_SIZE);
+
+	// update UI safely
+	const prevBtn = document.getElementById("prevBtn");
+	const nextBtn = document.getElementById("nextBtn");
+	const pageInfo = document.getElementById("pageInfo");
+
+	if (prevBtn && nextBtn) {
+		prevBtn.disabled = currentPage <= 1;
+		nextBtn.disabled = currentPage >= totalPages;
+	}
+
+	if (pageInfo) {
+		pageInfo.textContent =
+			`Page ${currentPage} / ${totalPages} (${totalHits.toLocaleString()} results)`;
+	}
+
+    let html = "";
+
+    for (let h of hits) {
+        const s = h._source;
+		const safeId = s.id ? s.id.replaceAll("/", "-") : "";
+
+        html += `
+        <div class="result">
+            <div class="title">
+                <a href="file:///media/mojusr/Huge/Books/Journals/arXiv/pdf/${safeId}.pdf">
+                    ${s.title || "(No title)"}
+                </a>
+            </div>
+
+            <div class="meta">
+                <b>ID:</b> ${s.id || ""}
+                | <b>Categories:</b> ${s.categories || ""}
+            </div>
+
+            <div class="meta">
+                <b>Authors:</b> ${s.authors || ""}
+            </div>
+
+            ${s["journal-ref"] ? `
+            <div class="meta">
+                <b>Journal:</b> ${s["journal-ref"]}
+            </div>` : ""}
+
+            ${s.doi ? `
+            <div class="meta">
+                <b>DOI:</b> ${s.doi}
+            </div>` : ""}
+
+            <p>${s.abstract ? s.abstract.substring(0, 500) : ""}</p>
+        </div>
+        `;
+    }
+
+    document.getElementById("results").innerHTML = html;
+}
+
+async function nextPage() {
+	currentPage++;
+	await search(currentPage);
+}
+
+async function prevPage() {
+	if (currentPage > 1) {
+		currentPage--;
+		await search(currentPage);
+	}
+}
+
+async function newSearch() {
+	currentPage = 1;
+	await search(1);
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("input, select").forEach(el => {
+        el.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                newSearch();
+            }
+        });
+    });
+});
+</script>
+
+</body>
+</html>

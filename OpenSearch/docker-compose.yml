@@ -1,0 +1,28 @@
+services:
+  opensearch:
+    image: opensearchproject/opensearch:latest
+    container_name: opensearch
+
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=
+
+      # CORS (for browser UI)
+      - http.cors.enabled=true
+      - http.cors.allow-origin=*
+      - http.cors.allow-headers=Authorization,Content-Type
+      - http.cors.allow-methods=OPTIONS,HEAD,GET,POST,PUT,DELETE
+
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+    volumes:
+      - /media/mojusr/Huge/Books/Journals/arXiv/opensearch/data:/usr/share/opensearch/data
+
+    ports:
+      - "9200:9200"
+      - "9600:9600"
