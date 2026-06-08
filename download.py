@@ -4,8 +4,25 @@ import time
 import json
 import re
 import os
+import socket
 
 subs = {
+    "cs": [
+        "cs.AI", "cs.AR", "cs.CC", "cs.CE", "cs.CG", "cs.CL", "cs.CR", "cs.CV",
+        "cs.CY", "cs.DB", "cs.DC", "cs.DL", "cs.DM", "cs.DS", "cs.ET", "cs.FL",
+        "cs.GL", "cs.GR", "cs.GT", "cs.HC", "cs.IR", "cs.IT", "cs.LG", "cs.LO",
+        "cs.MA", "cs.MM", "cs.MS", "cs.NA", "cs.NE", "cs.NI", "cs.OH", "cs.OS",
+        "cs.PF", "cs.PL", "cs.RO", "cs.SC", "cs.SD", "cs.SE", "cs.SI", "cs.SY"
+    ],
+
+    "econ": [
+        "econ.EM", "econ.GN", "econ.TH"
+    ],
+
+    "eess": [
+        "eess.AS", "eess.IV", "eess.SP", "eess.SY"
+    ],
+
     "math": [
         "math.AC", "math.AG", "math.AP", "math.AT",
         "math.CA", "math.CO", "math.CT", "math.CV",
@@ -16,18 +33,6 @@ subs = {
         "math.OC", "math.PR", "math.QA", "math.RA",
         "math.RT", "math.SG", "math.SP", "math.ST"
     ],
-
-    "cs": [
-        "cs.AI", "cs.AR", "cs.CC", "cs.CE", "cs.CG", "cs.CL", "cs.CR", "cs.CV",
-        "cs.CY", "cs.DB", "cs.DC", "cs.DL", "cs.DM", "cs.DS", "cs.ET", "cs.FL",
-        "cs.GL", "cs.GR", "cs.GT", "cs.HC", "cs.IR", "cs.IT", "cs.LG", "cs.LO",
-        "cs.MA", "cs.MM", "cs.MS", "cs.NA", "cs.NE", "cs.NI", "cs.OH", "cs.OS",
-        "cs.PF", "cs.PL", "cs.RO", "cs.SC", "cs.SD", "cs.SE", "cs.SI", "cs.SY"
-    ],
-
-    "econ": ["econ.EM", "econ.GN", "econ.TH"],
-
-    "eess": ["eess.AS", "eess.IV", "eess.SP", "eess.SY"],
 
     "astro-ph": [
         "astro-ph.CO", "astro-ph.EP", "astro-ph.GA",
@@ -40,7 +45,9 @@ subs = {
         "cond-mat.stat-mech", "cond-mat.str-el", "cond-mat.supr-con"
     ],
 
-    "nlin": ["nlin.AO", "nlin.CD", "nlin.CG", "nlin.PS", "nlin.SI"],
+    "nlin": [
+        "nlin.AO", "nlin.CD", "nlin.CG", "nlin.PS", "nlin.SI"
+    ],
 
     "physics": [
         "physics.acc-ph", "physics.ao-ph", "physics.app-ph",
@@ -63,11 +70,21 @@ subs = {
         "q-fin.PM", "q-fin.PR", "q-fin.RM", "q-fin.ST", "q-fin.TR"
     ],
 
-    "stat": ["stat.AP", "stat.CO", "stat.ME", "stat.ML", "stat.OT", "stat.TH"],
+    "stat": [
+        "stat.AP", "stat.CO", "stat.ME",
+        "stat.ML", "stat.OT", "stat.TH"
+    ],
 
     "high_energy": [
-        "gr-qc", "hep-ex", "hep-lat", "hep-ph", "hep-th",
-        "math-ph", "quant-ph"
+        "gr-qc",
+        "hep-ex",
+        "hep-lat",
+        "hep-ph",
+        "hep-th",
+        "math-ph",
+        "nucl-ex",
+        "nucl-th",
+        "quant-ph"
     ]
 }
 
@@ -75,6 +92,40 @@ parser = argparse.ArgumentParser()
 parser.add_argument('skip', type=int, default=0, nargs='?')
 args = parser.parse_args()
 skp_arg = args.skip
+
+def download_nohang(file_name, arxivid):
+
+    if os.path.exists(file_name):
+        print('-', end='')
+        return
+
+    url_base = "https://export.arxiv.org/pdf/"
+    all_url = url_base + arxivid
+
+    total_start = time.time()
+    timeout_per_try = 10
+    max_total_time = 30
+
+    while True:
+        # total timeout check
+        if time.time() - total_start > max_total_time:
+            print(f"\n[SKIP] {arxivid} (timeout > {max_total_time}s)")
+            return
+
+        try:
+            req = urllib.request.Request(all_url)
+            with urllib.request.urlopen(req, timeout=timeout_per_try) as response:
+                with open(file_name, "wb") as f:
+                    f.write(response.read())
+
+            print(file_name + " ---> downloaded.")
+            return
+
+        except (urllib.error.URLError, socket.timeout) as e:
+            # retry loop continues until 30s total exceeded
+            print(f"[retry] {arxivid} due to {type(e).__name__}")
+            time.sleep(1)
+            continue
 
 def download(file_name, arxivid):
     # p, f = os.path.split(file_name)
@@ -94,9 +145,14 @@ def download(file_name, arxivid):
     else:
         print('-', end='')
 
-
 math_subs_set = set(subs["math"])
-phys_subs_set = set(subs["physics"])
+phys_subs_set = set(
+    subs["physics"]
+    + subs["astro-ph"]
+    + subs["cond-mat"]
+    + subs["nlin"]
+    + subs["high_energy"]
+)
 
 skp = 0
 
@@ -121,4 +177,4 @@ with open('../arxiv-metadata-oai-snapshot.json', 'r') as metadatafile:
                 skp += 1
         except Exception as e:
             print(f'error was this -->{e}')
-            time.sleep(3)
+            # time.sleep(3)
