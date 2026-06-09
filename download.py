@@ -5,6 +5,8 @@ import json
 import re
 import os
 import socket
+import shutil
+import random
 
 subs = {
     "cs": [
