@@ -178,4 +178,3 @@ with open('../arxiv-metadata-oai-snapshot.json', 'r') as metadatafile:
                 skp += 1
         except Exception as e:
             print(f'error was this -->{e}')
-            time.sleep(5)
