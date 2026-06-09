@@ -93,57 +93,55 @@ parser.add_argument('skip', type=int, default=0, nargs='?')
 args = parser.parse_args()
 skp_arg = args.skip
 
-def download_nohang(file_name, arxivid):
-
-    if os.path.exists(file_name):
-        print('-', end='')
-        return
-
-    url_base = "https://export.arxiv.org/pdf/"
-    all_url = url_base + arxivid
-
-    total_start = time.time()
-    timeout_per_try = 10
-    max_total_time = 30
-
-    while True:
-        # total timeout check
-        if time.time() - total_start > max_total_time:
-            print(f"\n[SKIP] {arxivid} (timeout > {max_total_time}s)")
-            return
-
-        try:
-            req = urllib.request.Request(all_url)
-            with urllib.request.urlopen(req, timeout=timeout_per_try) as response:
-                with open(file_name, "wb") as f:
-                    f.write(response.read())
-
-            print(file_name + " ---> downloaded.")
-            return
-
-        except (urllib.error.URLError, socket.timeout) as e:
-            # retry loop continues until 30s total exceeded
-            print(f"[retry] {arxivid} due to {type(e).__name__}")
-            time.sleep(1)
-            continue
 
 def download(file_name, arxivid):
-    # p, f = os.path.split(file_name)
-    
-    # size = os.path.getsize(file_name) / 1024
-    # if (size < 10):
-        # os.remove(file_name)
-    
-    if not os.path.exists(file_name):
-        saveto = open(file_name, "wb")
-        url_base = "https://export.arxiv.org/pdf/"
-        all_url = url_base + arxivid
-        data = urllib.request.urlopen(all_url)
-        saveto.write(data.read())
-        saveto.close()
-        print(file_name+" ---> downloaded.")
-    else:
-        print('-', end='')
+    if os.path.exists(file_name):
+        print("-", end="")
+        return
+
+    url = f"https://export.arxiv.org/pdf/{arxivid}"
+
+    max_retries = 10
+    retry_delay = 10
+
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "arXiv downloader (personal research)"
+                }
+            )
+
+            with urllib.request.urlopen(req, timeout=30) as response:
+                with open(file_name, "wb") as out:
+                    shutil.copyfileobj(response, out)
+
+            print(f"{file_name} ---> downloaded.")
+
+            # Be polite to arXiv
+            time.sleep(random.uniform(3, 6))
+            return
+
+        except urllib.error.HTTPError as e:
+
+            if e.code == 429:
+                wait = retry_delay * (attempt + 1)
+                print(
+                    f"429 rate limit for {arxivid}, "
+                    f"retrying in {wait}s..."
+                )
+                time.sleep(wait)
+                continue
+
+            print(f"HTTP Error {e.code} for {arxivid}")
+            return
+
+        except Exception as e:
+            print(f"Error downloading {arxivid}: {e}")
+            return
+
+    print(f"FAILED after {max_retries} retries: {arxivid}")
 
 math_subs_set = set(subs["math"])
 phys_subs_set = set(
@@ -178,4 +176,4 @@ with open('../arxiv-metadata-oai-snapshot.json', 'r') as metadatafile:
                 skp += 1
         except Exception as e:
             print(f'error was this -->{e}')
-            time.sleep(3)
+            time.sleep(5)
