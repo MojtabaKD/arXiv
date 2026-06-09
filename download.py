@@ -149,6 +149,7 @@ math_subs_set = set(subs["math"])
 phys_subs_set = set(
     subs["physics"]
     + subs["astro-ph"]
+    + ["astro-ph"]
     + subs["cond-mat"]
     + subs["nlin"]
     + subs["high_energy"]
@@ -177,4 +178,4 @@ with open('../arxiv-metadata-oai-snapshot.json', 'r') as metadatafile:
                 skp += 1
         except Exception as e:
             print(f'error was this -->{e}')
-            # time.sleep(3)
+            time.sleep(3)
